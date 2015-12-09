@@ -1,0 +1,42 @@
+---
+
+- name: Check swapfile exists
+  shell: "swapon -s | grep '{{swap_filepath}}'"
+  register: swapcheck
+  changed_when: false
+
+- name: Name for set_fact module.
+  set_fact: swapfile_not_exist=true
+  when: swapcheck.stdout != ''
+
+- name: Create file for swap
+  command: /bin/dd if=/dev/zero of={{swap_filepath}} bs=1M count={{swap_size}} creates={{swap_filepath}}
+  when: swapfile_not_exist is defined
+
+- name: Enable swap
+  command: "{{item}}"
+  with_items:
+    - mkswap {{swap_filepath}}
+    - chmod 600 {{swap_filepath}}
+    - swapon {{swap_filepath}}
+  when: swapfile_not_exist is defined
+
+- name: Mount swapfile
+  lineinfile: dest=/etc/fstab line="{{swap_filepath}} swap swap defaults 0 0"
+  when: swapfile_not_exist is defined
+
+- name: Mount the swap
+  command: mount -a 
+  when: swapfile_not_exist is defined
+
+- name: Config swappines
+  lineinfile: dest=/etc/sysctl.conf line="vm.swappiness = 60"
+
+- name: Change swappines settings
+  command: sysctl -w vm.swappiness=60
+
+- name: Config vfs_cache_pressure config
+  lineinfile: dest=/etc/sysctl.conf line="vm.vfs_cache_pressure = 50"  
+
+- name: Chane vfs_cache_pressure settings
+  command: sysctl -w vm.vfs_cache_pressure=50
